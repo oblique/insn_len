@@ -28,7 +28,7 @@
 #define INSN_LEN_H
 
 /* References:
- * Intel 64 and IA-32 Architectures Software Developer's Manuals - Volume 2A ch. 2
+ * Intel 64 and IA-32 Architectures Software Developer's Manuals - Volume 2A Ch. 2
  * http://ref.x86asm.net
  * http://sandpile.org
  */
@@ -38,9 +38,8 @@
 #define RM_M        0x7
 #define Base_M      0x7
 
-/* Prefixes (4bytes) + Opcodes (3bytes) + ModR/M (1byte) + SIB (1byte)
- * + Displacement (4bytes) + Immediate (4bytes) = 17bytes
- */
+// Prefixes (4 bytes) + Opcodes (3 bytes) + ModR/M (1 byte) + SIB (1 byte)
+// + Displacement (4 bytes) + Immediate (4 bytes) = 17 bytes
 #define MAX_INSN_LEN_x86_32  17
 
 #ifdef __i386__
@@ -69,7 +68,7 @@ static int insn_len_x86_32(void *insn) {
     while (*c == 0xf0 || *c == 0xf2 || *c == 0xf3 ||
             *c == 0x2e || *c == 0x36 || *c == 0x3e || *c == 0x26 ||
             (*c & 0xfc) == 0x64) {
-        if (*c == 0x66) // 16bit operand
+        if (*c == 0x66) // 16bit operands
             operand16 = 1;
         if (*c == 0x67) // 16bit addressing
             addr16 = 1;
@@ -77,7 +76,7 @@ static int insn_len_x86_32(void *insn) {
         len++;
     }
 
-    /* 0x9b prefix is used only by the following opcodes (1byte opcodes)
+    /* 0x9b prefix is used only by the following 1byte opcodes
      *
      * 0xd9 Mod != 11 Reg/Op = 110 or 111
      * 0xdb ModR/M = 0xe2 or 0xe3
@@ -125,7 +124,7 @@ static int insn_len_x86_32(void *insn) {
         opcode == 0xfe || opcode == 0xff))
             has_modrm = 1;
 
-    /* 2bytes opcodes that they *dont* use ModR/M byte:
+    /* 2bytes opcodes that they *don't* use ModR/M byte:
      *
      * 0x05 - 0x09, 0x0b, 0x0e,
      * 0x30 - 0x37, 0x77, 0x80 - 0x8f,
@@ -157,7 +156,7 @@ static int insn_len_x86_32(void *insn) {
         modrm = *c++;
         if (!addr16 && (modrm & (Mod_M | RM_M)) == 5) // Mod = 00 R/M = 101
             len += 4;
-        if (addr16 && (modrm & (Mod_M | RM_M)) == 6) // Mod = 00 R/M = 110 (16bit addressing)
+        if (addr16 && (modrm & (Mod_M | RM_M)) == 6) // Mod = 00 R/M = 110 and 16bit addressing
             len += 2;
         if ((modrm & Mod_M) == 0x40) // Mod = 01
             len += 1;
@@ -165,7 +164,7 @@ static int insn_len_x86_32(void *insn) {
             len += addr16 ? 2 : 4;
 
         // check SIB byte
-        if (!addr16 && (modrm & Mod_M) != Mod_M && (modrm & RM_M) == 4) { // if has SIB
+        if (!addr16 && (modrm & Mod_M) != Mod_M && (modrm & RM_M) == 4) { // if it has SIB
             len++;
             if ((modrm & Mod_M) == 0 && (*c & Base_M) == 5) // Mod = 00  Base = 101
                 len += 4;
@@ -173,7 +172,7 @@ static int insn_len_x86_32(void *insn) {
         }
     }
 
-    /* immediate operands 
+    /* Immediate operands 
      *
      * 1byte opcode list:
      *
@@ -204,7 +203,7 @@ static int insn_len_x86_32(void *insn) {
      *
      * 2bytes opcode list:
      *
-     * imm8 
+     * imm8 (1 byte)
      *
      * 0x70 - 0x73, 0xa4, 0xac, 0xba, 0xc2, 0xc4 - 0xc6
      * 
@@ -212,8 +211,8 @@ static int insn_len_x86_32(void *insn) {
      *
      * 0x80 - 0x8f
      *
-     * all 3bytes opcodes with 0x3a prefix has imm8
      *
+     * all 3bytes opcodes with 0x3a prefix have imm8
      */
     if (!twobytes) { // 1byte opcodes
         // imm8
