@@ -10,7 +10,7 @@ int main() {
     while (1) {
         len = insn_len(p);
 
-        printf("length: %2d   pos: %4x    bytes:  ", len, pos);
+        printf("length: %2d   position: %4x    bytes:  ", len, pos);
 
         for (i=0; i < len; i++)
             printf("%02x ", p[i]);
