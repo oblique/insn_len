@@ -4,7 +4,7 @@
 
 int main() {
     int pos = 0, len, i;
-    unsigned char *p = (unsigned char*)insn_len_x86_32;
+    unsigned char *p = (unsigned char*)main;
 
 
     while (1) {
@@ -16,7 +16,7 @@ int main() {
             printf("%02x ", p[i]);
         printf("\n");
 
-        if (*p == 0xc3)
+        if (*p == 0xc3) // ret
             break;
 
         pos += len;

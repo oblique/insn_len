@@ -34,28 +34,40 @@
  */
 
 #define Mod_M       0xc0
-#define RegOp_M     0x38
 #define RM_M        0x7
 #define Base_M      0x7
+#define REX_W       0x8
 
-// Prefixes (4 bytes) + Opcodes (3 bytes) + ModR/M (1 byte) + SIB (1 byte)
-// + Displacement (4 bytes) + Immediate (4 bytes) = 17 bytes
+/* Prefixes (4 bytes) + Opcodes (3 bytes) + ModR/M (1 byte) + SIB (1 byte)
+ * + Displacement (4 bytes) + Immediate (4 bytes) = 17 bytes
+ */
 #define MAX_INSN_LEN_x86_32  17
 
+/* Prefixes (4 bytes) + REX (1 byte_ Opcodes (3 bytes) + ModR/M (1 byte)
+ * + SIB (1 byte) + Displacement (4 bytes) + Immediate (4 bytes) = 18 bytes
+ */
+#define MAX_INSN_LEN_x86_64  18
+
+enum __bits { __b16, __b32, __b64 };
+
+#define insn_len_x86_32(insn)   __insn_len_x86(insn, __b32)
+#define insn_len_x86_64(insn)   __insn_len_x86(insn, __b64)
+
 #ifdef __i386__
-#define insn_len        insn_len_x86_32
+#define insn_len(insn)  insn_len_x86_32(insn)
 #define MAX_INSN_LEN    MAX_INSN_LEN_x86_32
+#elif defined(__x86_64__)
+#define insn_len(insn)  insn_len_x86_64(insn)
+#define MAX_INSN_LEN    MAX_INSN_LEN_x86_64
 #endif
 
-/* TODO
- * x86-64 support
- */
 
-/* This function returns the length of an x86-32 instruction.
+/* This function returns the length of an x86 instruction.
  * I assume that instruction is valid.
  */
-static int insn_len_x86_32(void *insn) {
-    int len = 0, operand16 = 0, addr16 = 0, twobytes = 0, has_modrm = 0;
+static int __insn_len_x86(void *insn, enum __bits bits) {
+    int len = 0, twobytes = 0, has_modrm = 0;
+    enum __bits operand_bits = __b32, addr_bits = bits;
     unsigned char *c = (unsigned char*)insn, modrm, opcode;
 
     /* prefixes
@@ -68,10 +80,17 @@ static int insn_len_x86_32(void *insn) {
     while (*c == 0xf0 || *c == 0xf2 || *c == 0xf3 ||
             *c == 0x2e || *c == 0x36 || *c == 0x3e || *c == 0x26 ||
             (*c & 0xfc) == 0x64) {
-        if (*c == 0x66) // 16bit operands
-            operand16 = 1;
-        if (*c == 0x67) // 16bit addressing
-            addr16 = 1;
+        if (*c == 0x66) // 16bits operands
+            operand_bits = __b16;
+        if (*c == 0x67) // 16bits addressing (x86-32), 32bits addressing (x86-64)
+            addr_bits = bits == __b32 ? __b16 : __b32;
+        c++;
+        len++;
+    }
+
+    if (bits == __b64 && (*c & 0xf0) == 0x40) { // x86-64 && REX byte
+        if (*c & REX_W)
+            operand_bits = __b64;
         c++;
         len++;
     }
@@ -109,9 +128,10 @@ static int insn_len_x86_32(void *insn) {
      * 0x20 - 0x23, 0x28 - 0x2b,
      * 0x30 - 0x33, 0x38 - 0x3b,
      * 0x62, 0x63, 0x69, 0x6b,
-     * 0x80 - 0x8f, 0xc0 - 0xc7,
+     * 0x80 - 0x8f, 0xc0, 0xc1,
+     * 0xc4 - 0xc7,
      * 0xd0 - 0xd3, 0xd8 - 0xdf
-     * 0xf6, 0xf7, 0xfe - 0xff
+     * 0xf6, 0xf7, 0xfe, 0xff
      */
 
     if (!twobytes && 
@@ -119,7 +139,7 @@ static int insn_len_x86_32(void *insn) {
         (opcode & 0xf4) == 0x20 || (opcode & 0xf4) == 0x30 || 
         opcode == 0x62 || opcode == 0x63 || opcode == 0x69 || opcode == 0x6b ||
         (opcode & 0xf0) == 0x80 || opcode == 0xc0 || opcode == 0xc1 ||
-        (opcode & 0xfc) == 0xc4 ||(opcode & 0xfc) == 0xd0 || 
+        (opcode & 0xfc) == 0xc4 || (opcode & 0xfc) == 0xd0 || 
         (opcode & 0xf8) == 0xd8 || opcode == 0xf6 || opcode == 0xf7 || 
         opcode == 0xfe || opcode == 0xff))
             has_modrm = 1;
@@ -154,19 +174,19 @@ static int insn_len_x86_32(void *insn) {
     if (has_modrm) {
         len++;
         modrm = *c++;
-        if (!addr16 && (modrm & (Mod_M | RM_M)) == 5) // Mod = 00 R/M = 101
+        if (addr_bits != __b16 && (modrm & (Mod_M | RM_M)) == 5) // Mod = 00 R/M = 101
             len += 4;
-        if (addr16 && (modrm & (Mod_M | RM_M)) == 6) // Mod = 00 R/M = 110 and 16bit addressing
+        if (addr_bits == __b16 && (modrm & (Mod_M | RM_M)) == 6) // Mod = 00 R/M = 110 and 16bits addressing
             len += 2;
         if ((modrm & Mod_M) == 0x40) // Mod = 01
             len += 1;
         if ((modrm & Mod_M) == 0x80) // Mod = 10
-            len += addr16 ? 2 : 4;
+            len += addr_bits == __b16 ? 2 : 4;
 
         // check SIB byte
-        if (!addr16 && (modrm & Mod_M) != Mod_M && (modrm & RM_M) == 4) { // if it has SIB
+        if (addr_bits != __b16 && (modrm & Mod_M) != Mod_M && (modrm & RM_M) == 4) { // if it has SIB
             len++;
-            if ((modrm & Mod_M) == 0 && (*c & Base_M) == 5) // Mod = 00  Base = 101
+            if ((modrm & Mod_M) == 0 && (*c & Base_M) == 5) // Mod = 00   SIB Base = 101
                 len += 4;
             c++;
         }
@@ -186,12 +206,16 @@ static int insn_len_x86_32(void *insn) {
      *
      * 0xc2, 0xca
      *
-     * imm16/32 (2 bytes if operand16 else 4 bytes)
+     * imm16/32 (2 bytes if operand_bits == __b16 else 4 bytes)
      *
      * 0x05, 0x0d, 0x15, 0x1d, 0x25, 0x2d, 0x35, 0x3d, 0x68, 0x69, 0x81, 0xa9
-     * 0xb8 - 0xbf, 0xc7, 0xe8, 0xe9, 0xf7 (Reg/Op = 000 or Reg/Op = 001)
+     * 0xc7, 0xe8, 0xe9 
      *
-     * moffs (2 bytes if addr16 else 4 bytes)
+     * imm16/32/64 (2 bytes if operand_bits == __b16, 4 bytes if __b32, 8 bytes if __b64)
+     *
+     * 0xb8 - 0xbf, 0xf7 (Reg/Op = 000 or Reg/Op = 001)
+     *
+     * moffs (2 bytes if addr_bits == __b16, 4 bytes if __b32, 8 bytes if __b64)
      *
      * 0xa0, 0xa1, 0xa2, 0xa3
      *
@@ -207,7 +231,7 @@ static int insn_len_x86_32(void *insn) {
      *
      * 0x70 - 0x73, 0xa4, 0xac, 0xba, 0xc2, 0xc4 - 0xc6
      * 
-     * imm16/32 (2 bytes if operand16 else 4 bytes)
+     * imm16/32 (2 bytes if operand_bits == __b16 else 4 bytes)
      *
      * 0x80 - 0x8f
      *
@@ -232,18 +256,21 @@ static int insn_len_x86_32(void *insn) {
         // imm16/32
         if (((opcode & 7) == 5 && (opcode & 0xf0) <= 0x30) ||
             opcode == 0x68 || opcode == 0x69 || opcode == 0x81 ||
-            opcode == 0xa9 || (opcode & 0xf8) == 0xb8 ||
-            opcode == 0xc7 || opcode == 0xe8 || opcode == 0xe9 ||
-            (opcode == 0xf7 && (modrm & 0x30) == 0))
-                len += operand16 ? 2 : 4;
+            opcode == 0xa9 || opcode == 0xc7 || opcode == 0xe8 ||
+            opcode == 0xe9)
+                len += operand_bits == __b16 ? 2 : 4;
+
+        // imm16/32/64
+        if ((opcode & 0xf8) == 0xb8 || (opcode == 0xf7 && (modrm & 0x30) == 0))
+            len += operand_bits == __b16 ? 2 : operand_bits == __b32 ? 4 : 8;
 
         // moffs
         if ((opcode & 0xfc) == 0xa0)
-            len += addr16 ? 2 : 4;
+            len += addr_bits == __b16 ? 2 : addr_bits == __b32 ? 4 : 8;
 
         // others
         if (opcode == 0xea || opcode == 0x9a)
-            len += 2 + (operand16 ? 2 : 4);
+            len += 2 + (operand_bits == __b16 ? 2 : 4);
         if (opcode == 0xc8)
             len += 3;
     } else { // 2bytes opcodes
@@ -255,12 +282,18 @@ static int insn_len_x86_32(void *insn) {
 
         // imm16/32
         if ((opcode & 0xf0) == 0x80)
-            len += operand16 ? 2 : 4;
+            len += operand_bits == __b16 ? 2 : 4;
 
         // 3bytes opcodes with 0x3a prefix
         if (opcode == 0x3a)
             len += 1;
     }
+
+    // wrong length
+    if (bits == __b32 && len > MAX_INSN_LEN_x86_32)
+        len = 1;
+    else if (bits == __b64 && len > MAX_INSN_LEN_x86_64)
+        len = 1;
 
     return len;
 }

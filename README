@@ -1,9 +1,14 @@
-With insn_len_x86_32 function you can get the length of an x86-32 instruction,
-it takes one argument, the pointer to the first byte of the instruction. With
-MAX_INSN_LEN_x86_32 you can get the maximum length of a valid instruction.
+With insn_len function you can get the length of an instruction, it takes one
+argument, the pointer to the first byte of the instruction. With MAX_INSN_LEN
+you can get the maximum length of a valid instruction.
 
-Supported architectures: x86-32
-License: BSD
+Note: insn_len and MAX_INSN_LEN are macros whose expansion depends on your
+architecture, the actual names are:
+x86-32: insn_len_x86_32, MAX_INSN_LEN_x86_32
+x86-64: insn_len_x86_64, MAX_INSN_LEN_x86_64
+
+Supported architectures: x86-32, x86-64
+License: FreeBSD
 
 References:
 1) Intel 64 and IA-32 Architectures Software Developer's Manuals - Volume 2A Ch. 2
