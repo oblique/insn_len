@@ -33,6 +33,10 @@
  * http://sandpile.org
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define Mod_M       0xc0
 #define RM_M        0x7
 #define Base_M      0x7
@@ -297,5 +301,9 @@ static int __insn_len_x86(void *insn, enum __bits bits) {
 
     return len;
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
