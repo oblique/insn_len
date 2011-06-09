@@ -42,15 +42,9 @@ extern "C" {
 #define Base_M      0x7
 #define REX_W       0x8
 
-/* Prefixes (4 bytes) + Opcodes (3 bytes) + ModR/M (1 byte) + SIB (1 byte)
- * + Displacement (4 bytes) + Immediate (4 bytes) = 17 bytes
- */
-#define MAX_INSN_LEN_x86_32  17
-
-/* Prefixes (4 bytes) + REX (1 byte_ Opcodes (3 bytes) + ModR/M (1 byte)
- * + SIB (1 byte) + Displacement (4 bytes) + Immediate (4 bytes) = 18 bytes
- */
-#define MAX_INSN_LEN_x86_64  18
+#define MAX_INSN_LEN_x86    15
+#define MAX_INSN_LEN_x86_32 MAX_INSN_LEN_x86
+#define MAX_INSN_LEN_x86_64 MAX_INSN_LEN_x86
 
 enum __bits { __b16, __b32, __b64 };
 
@@ -294,9 +288,7 @@ static int __insn_len_x86(void *insn, enum __bits bits) {
     }
 
     // wrong length
-    if (bits == __b32 && len > MAX_INSN_LEN_x86_32)
-        len = 1;
-    else if (bits == __b64 && len > MAX_INSN_LEN_x86_64)
+    if (len > MAX_INSN_LEN_x86)
         len = 1;
 
     return len;

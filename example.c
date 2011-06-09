@@ -22,4 +22,6 @@ int main() {
         pos += len;
         p += len;
     }
+
+    return 0;
 }
